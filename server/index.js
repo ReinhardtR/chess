@@ -1,27 +1,36 @@
-const express = require("express");
-const http = require("http");
-const socketio = require("socket.io");
+const app = require("express")();
+const http = require("http").createServer(app);
+const io = require("socket.io")(http);
 const cors = require("cors");
-
-const app = express();
-const server = http.createServer(app);
-const io = socketio(server);
-
 app.use(cors());
 
 const PORT = process.env.PORT || 4000;
 
+var serverRooms = [];
+
 io.on("connection", (socket) => {
-  console.log(`Socket ${socket.id} connected.`);
-  socket.on("msg", (fen) => {
-    socket.broadcast.emit("msg", fen);
+  // Join room
+  socket.on("join-room", ({ id, create }) => {
+    socket.join(id);
+    if (create) serverRooms.push(id);
   });
 
+  // Recieve move
+  socket.on("move", ({ room, move }) => {
+    socket.to(room).emit("move", move);
+  });
+
+  // Disconnect
   socket.on("disconnect", () => {
     console.log(`Socket ${socket.id} disconnected.`);
   });
+
+  // Send list of rooms
+  socket.on("req-server-rooms", () => {
+    io.emit("get-server-rooms", serverRooms);
+  });
 });
 
-server.listen(PORT, () => {
+http.listen(PORT, () => {
   console.log(`listening on port ${PORT}`);
 });

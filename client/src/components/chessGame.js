@@ -1,40 +1,32 @@
-import React, { useState, useEffect } from "react";
-import { io } from "socket.io-client";
+import React, { useState, useEffect, useContext } from "react";
+import { SocketContext } from "../server";
 import Chess from "chess.js";
 import Chessground from "react-chessground";
 import "react-chessground/dist/styles/chessground.css";
-import Modal from "./modal";
-import Loading from "./loading";
-
-const socket = io.connect("http://localhost:4000", {
-  transports: ["websocket"],
-  upgrade: false,
-});
+import Modal from "./Modal";
 
 const chess = new Chess();
 
-export default function ChessGame() {
-  const [connecting, setConnecting] = useState(true);
+export default function ChessGame({ room }) {
+  const socket = useContext(SocketContext);
+
   const [lastMove, setLastMove] = useState();
   const [pendingMove, setPendingMove] = useState();
   const [fen, setFen] = useState("");
   const [selectVisible, setSelectVisible] = useState(false);
 
-  socket.on("connect", () => {
-    setConnecting(false);
+  // Recieve move from server
+  socket.on("move", (move) => {
+    if (!move) return;
+    chess.move({ from: move[0], to: move[1] });
+    setLastMove(move);
+    setFen(chess.fen());
   });
 
-  // Send fen to server
+  // Send move to server
   useEffect(() => {
-    socket.emit("msg", fen);
-  }, [fen]);
-
-  // Recieve fen from server
-  useEffect(() => {
-    socket.on("msg", (newFen) => {
-      setFen(newFen);
-    });
-  }, [setFen]);
+    socket.emit("move", { room, move: lastMove });
+  }, [lastMove]);
 
   const onMove = (from, to) => {
     const moves = chess.moves({ verbose: true });
@@ -48,19 +40,19 @@ export default function ChessGame() {
     if (chess.move({ from, to, promotion: "x" })) {
       setFen(chess.fen());
       setLastMove([from, to]);
-      setTimeout(randomMove, 500);
+      // setTimeout(randomMove, 500);
     }
   };
 
-  const randomMove = () => {
-    const moves = chess.moves({ verbose: true });
-    const move = moves[Math.floor(Math.random() * moves.length)];
-    if (moves.length > 0) {
-      chess.move(move.san);
-      setFen(chess.fen());
-      setLastMove([move.from, move.to]);
-    }
-  };
+  // const randomMove = () => {
+  //   const moves = chess.moves({ verbose: true });
+  //   const move = moves[Math.floor(Math.random() * moves.length)];
+  //   if (moves.length > 0) {
+  //     chess.move(move.san);
+  //     setFen(chess.fen());
+  //     setLastMove([move.from, move.to]);
+  //   }
+  // };
 
   const promotion = (piece) => {
     const from = pendingMove[0];
@@ -69,7 +61,7 @@ export default function ChessGame() {
     setFen(chess.fen());
     setLastMove([from, to]);
     setSelectVisible(false);
-    setTimeout(randomMove, 500);
+    // setTimeout(randomMove, 500);
   };
 
   const turnColor = () => {
@@ -95,14 +87,7 @@ export default function ChessGame() {
     };
   };
 
-  return connecting ? (
-    <div className="h-screen w-screen flex justify-center items-center">
-      <Loading
-        className="w-32 h-32 text-blue-600 font-bold text-2xl"
-        text="Connecting"
-      />
-    </div>
-  ) : (
+  return (
     <div className="bg-white h-screen flex justify-center items-center">
       <Chessground
         width="40vw"
@@ -115,11 +100,13 @@ export default function ChessGame() {
       />
       <Modal visible={selectVisible}>
         {["q", "r", "b", "n"].map((piece) => (
-          <div className="group flex justify-center items-center w-24 h-24 transition-all rounded-full transform hover:bg-blue-500 hover:scale-110">
+          <div
+            className="group flex justify-center items-center w-24 h-24 transition-all rounded-full transform hover:bg-blue-500 hover:scale-110"
+            key={piece}
+          >
             <div
               onClick={() => promotion(piece)}
               className={`piece ${turnColor()}-${piece} w-5/6 h-5/6 transition-all transform group-hover:-translate-y-1`}
-              key={piece}
             />
           </div>
         ))}
