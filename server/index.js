@@ -17,7 +17,8 @@ io.on("connection", (socket) => {
 
   // Recieve move
   socket.on("move", ({ room, move }) => {
-    socket.to(room).emit("move", move);
+    console.log(move);
+    socket.to(room).emit("move", { move });
   });
 
   // Disconnect

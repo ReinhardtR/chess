@@ -9,6 +9,7 @@ export default function App() {
   const [connecting, setConnecting] = useState(true);
   const [rooms, setRooms] = useState();
   const [roomId, setRoomId] = useState();
+  const [playerColor, setPlayerColor] = useState();
 
   socket.on("get-server-rooms", (serverRooms) => {
     setRooms(serverRooms);
@@ -21,11 +22,11 @@ export default function App() {
   const joinRoom = ({ id, create = false }) => {
     socket.emit("join-room", { id, create });
     setRoomId(id);
+    setPlayerColor(create ? "white" : "black");
     setConnecting(false);
   };
 
   if (connecting) {
-    console.log(rooms);
     return (
       <>
         <button onClick={() => getRooms()}>GET ROOMS</button>
@@ -52,7 +53,7 @@ export default function App() {
   } else {
     return (
       <>
-        <ChessGame room={roomId} />
+        <ChessGame room={roomId} playerColor={playerColor} />
       </>
     );
   }

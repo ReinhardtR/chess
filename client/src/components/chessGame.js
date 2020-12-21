@@ -1,77 +1,101 @@
-import React, { useState, useEffect, useContext } from "react";
+import React from "react";
 import { SocketContext } from "../server";
 import Chess from "chess.js";
 import Chessground from "react-chessground";
 import "react-chessground/dist/styles/chessground.css";
 import Modal from "./Modal";
 
-const chess = new Chess();
+export default class ChessGame extends React.Component {
+  constructor() {
+    super();
 
-export default function ChessGame({ room }) {
-  const socket = useContext(SocketContext);
+    this.chess = new Chess();
 
-  const [lastMove, setLastMove] = useState();
-  const [pendingMove, setPendingMove] = useState();
-  const [fen, setFen] = useState("");
-  const [selectVisible, setSelectVisible] = useState(false);
+    this.state = {
+      turn: "white",
+      lastMove: undefined,
+      pendingMove: undefined,
+      fen: "",
+      selectVisible: false,
+    };
+  }
 
-  // Recieve move from server
-  socket.on("move", (move) => {
-    if (!move) return;
-    chess.move({ from: move[0], to: move[1] });
-    setLastMove(move);
-    setFen(chess.fen());
-  });
+  componentDidMount() {
+    console.log("stateTurn", this.state.turn);
+    console.log("propsColor", this.props.playerColor);
+    this.context.on("move", ({ move }) => {
+      console.log(move);
+      this.chess.move(move);
+      this.setState({
+        turn: this.props.playerColor,
+        lastMove: move,
+        fen: this.chess.fen(),
+      });
+    });
+  }
 
-  // Send move to server
-  useEffect(() => {
-    socket.emit("move", { room, move: lastMove });
-  }, [lastMove]);
+  componentWillUnmount() {
+    this.context.disconnect();
+  }
 
-  const onMove = (from, to) => {
-    const moves = chess.moves({ verbose: true });
+  sendMoveToServer() {
+    console.log(this.state.lastMove);
+    this.context.emit(
+      "move",
+      {
+        room: this.props.room,
+        move: this.state.lastMove,
+      },
+      () =>
+        this.setState({
+          turn: this.props.playerColor === "white" ? "black" : "white",
+        })
+    );
+  }
+
+  onMove = (from, to) => {
+    const moves = this.chess.moves({ verbose: true });
     for (let i = 0, len = moves.length; i < len; i++) {
       if (moves[i].flags.indexOf("p") !== -1 && moves[i].from === from) {
-        setPendingMove([from, to]);
-        setSelectVisible(true);
-        return;
+        this.setState({
+          pendingMove: [from, to],
+          selectVisible: true,
+        });
       }
     }
-    if (chess.move({ from, to, promotion: "x" })) {
-      setFen(chess.fen());
-      setLastMove([from, to]);
-      // setTimeout(randomMove, 500);
+    if (this.chess.move({ from, to, promotion: "x" })) {
+      this.setState(
+        {
+          fen: this.chess.fen(),
+          lastMove: { from, to },
+          turn: this.props.playerColor === "white" ? "black" : "white",
+        },
+        () => this.sendMoveToServer()
+      );
     }
   };
 
-  // const randomMove = () => {
-  //   const moves = chess.moves({ verbose: true });
-  //   const move = moves[Math.floor(Math.random() * moves.length)];
-  //   if (moves.length > 0) {
-  //     chess.move(move.san);
-  //     setFen(chess.fen());
-  //     setLastMove([move.from, move.to]);
-  //   }
-  // };
-
-  const promotion = (piece) => {
-    const from = pendingMove[0];
-    const to = pendingMove[1];
-    chess.move({ from, to, promotion: piece });
-    setFen(chess.fen());
-    setLastMove([from, to]);
-    setSelectVisible(false);
-    // setTimeout(randomMove, 500);
+  promotion = (piece) => {
+    const move = {
+      from: this.state.pendingMove[0],
+      to: this.state.pendingMove[1],
+      promotion: piece,
+    };
+    this.chess.move(move);
+    this.setState(
+      {
+        fen: this.chess.fen(),
+        lastMove: move,
+        selectVisible: false,
+      },
+      () => this.sendMoveToServer()
+    );
   };
 
-  const turnColor = () => {
-    return chess.turn() === "w" ? "white" : "black";
-  };
-
-  const calcMovable = () => {
+  calcMovable = () => {
     const dests = new Map();
-    chess.SQUARES.forEach((square) => {
-      const moves = chess.moves({ square, verbose: true });
+    this.chess.SQUARES.forEach((square) => {
+      const moves = this.chess.moves({ square, verbose: true });
       if (moves.length) {
         dests.set(
           square,
@@ -83,34 +107,39 @@ export default function ChessGame({ room }) {
     return {
       free: false,
       dests,
-      color: "white",
+      color: this.props.playerColor,
     };
   };
 
-  return (
-    <div className="bg-white h-screen flex justify-center items-center">
-      <Chessground
-        width="40vw"
-        height="40vw"
-        turnColor={turnColor()}
-        movable={calcMovable()}
-        lastMove={lastMove}
-        fen={fen}
-        onMove={onMove}
-      />
-      <Modal visible={selectVisible}>
-        {["q", "r", "b", "n"].map((piece) => (
-          <div
-            className="group flex justify-center items-center w-24 h-24 transition-all rounded-full transform hover:bg-blue-500 hover:scale-110"
-            key={piece}
-          >
+  render() {
+    return (
+      <div className="bg-white h-screen flex justify-center items-center">
+        <div>{this.props.room}</div>
+        <Chessground
+          width="40vw"
+          height="40vw"
+          turnColor={this.state.turn}
+          movable={this.calcMovable()}
+          lastMove={this.lastMove}
+          fen={this.state.fen}
+          onMove={this.onMove}
+          orientation={this.props.playerColor}
+        />
+        <Modal visible={this.state.selectVisible}>
+          {["q", "r", "b", "n"].map((piece) => (
             <div
-              onClick={() => promotion(piece)}
-              className={`piece ${turnColor()}-${piece} w-5/6 h-5/6 transition-all transform group-hover:-translate-y-1`}
-            />
-          </div>
-        ))}
-      </Modal>
-    </div>
-  );
+              className="group flex justify-center items-center w-24 h-24 transition-all rounded-full transform hover:bg-blue-500 hover:scale-110"
+              key={piece}
+            >
+              <div
+                onClick={() => this.promotion(piece)}
+                className={`piece ${this.state.turn}-${piece} w-5/6 h-5/6 transition-all transform group-hover:-translate-y-1`}
+              />
+            </div>
+          ))}
+        </Modal>
+      </div>
+    );
+  }
 }
+ChessGame.contextType = SocketContext;
