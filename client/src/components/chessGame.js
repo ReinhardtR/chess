@@ -95,7 +95,7 @@ export default function ChessGame() {
     };
   };
 
-  return true ? (
+  return connecting ? (
     <div className="h-screen w-screen flex justify-center items-center">
       <Loading
         className="w-32 h-32 text-blue-600 font-bold text-2xl"

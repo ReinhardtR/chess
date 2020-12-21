@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 
 export default function Loading({ text, ...restProps }) {
-  const [label, setLabel] = useState(text);
+  const [label, setLabel] = useState("");
 
   setTimeout(() => {
-    if (label.length === 3) setLabel("");
+    if (label.length >= 3) setLabel("");
     else setLabel(label + ".");
   }, 800);
 
