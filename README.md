@@ -1,12 +1,12 @@
 # Chess
 
-## Front-end
-React
-Tailwind CSS
-Socket.IO Client
+### Front-end
+- **React**
+- **Tailwind CSS**
+- **Socket.IO Client**
 
 
-## Back-end
-Node.js
-Express
-Socket.IO
+### Back-end
+- **Node.js**
+- **Express**
+- **Socket.IO**
