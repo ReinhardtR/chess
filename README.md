@@ -2,10 +2,9 @@
 
 ### Front-end
 - **React**
+- **Material-UI**
 - **Reach Router**
-- **Tailwind CSS**
 - **Socket.IO Client**
-
 
 ### Back-end
 - **Express**
