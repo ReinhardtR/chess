@@ -1,86 +1,85 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
+import { io } from "socket.io-client";
 import Chess from "chess.js";
 import Chessground from "react-chessground";
 import "react-chessground/dist/styles/chessground.css";
-import { Modal } from "antd";
-import "antd/dist/antd.css";
-import queen from "../images/wQ.svg";
-import rook from "../images/wR.svg";
-import bishop from "../images/wB.svg";
-import knight from "../images/wN.svg";
+import Modal from "./modal";
+import Loading from "./loading";
 
-export default class App extends React.Component {
-  constructor(props) {
-    super(props);
+const socket = io.connect("http://localhost:4000", {
+  transports: ["websocket"],
+  upgrade: false,
+});
 
-    this.wrapper = React.createRef();
+const chess = new Chess();
 
-    this.chess = new Chess();
+export default function ChessGame() {
+  const [connecting, setConnecting] = useState(true);
+  const [lastMove, setLastMove] = useState();
+  const [pendingMove, setPendingMove] = useState();
+  const [fen, setFen] = useState("");
+  const [selectVisible, setSelectVisible] = useState(false);
 
-    this.state = {
-      lastMove: undefined,
-      pendingMove: undefined,
-      fen: "",
-      selectVisible: false,
-    };
-  }
+  socket.on("connect", () => {
+    setConnecting(false);
+  });
 
-  onMove = (from, to) => {
-    const moves = this.chess.moves({ verbose: true });
+  // Send fen to server
+  useEffect(() => {
+    socket.emit("msg", fen);
+  }, [fen]);
+
+  // Recieve fen from server
+  useEffect(() => {
+    socket.on("msg", (newFen) => {
+      setFen(newFen);
+    });
+  }, [setFen]);
+
+  const onMove = (from, to) => {
+    const moves = chess.moves({ verbose: true });
     for (let i = 0, len = moves.length; i < len; i++) {
       if (moves[i].flags.indexOf("p") !== -1 && moves[i].from === from) {
-        this.setState({
-          pendingMove: [from, to],
-          selectVisible: true,
-        });
+        setPendingMove([from, to]);
+        setSelectVisible(true);
         return;
       }
     }
-    if (this.chess.move({ from, to, promotion: "x" })) {
-      this.setState({
-        fen: this.chess.fen(),
-        lastMove: [from, to],
-      });
-      setTimeout(this.randomMove, 500);
+    if (chess.move({ from, to, promotion: "x" })) {
+      setFen(chess.fen());
+      setLastMove([from, to]);
+      setTimeout(randomMove, 500);
     }
   };
 
-  randomMove = () => {
-    const moves = this.chess.moves({ verbose: true });
+  const randomMove = () => {
+    const moves = chess.moves({ verbose: true });
     const move = moves[Math.floor(Math.random() * moves.length)];
     if (moves.length > 0) {
-      this.chess.move(move.san);
-      this.setState({
-        fen: this.chess.fen(),
-        lastMove: [move.from, move.to],
-      });
+      chess.move(move.san);
+      setFen(chess.fen());
+      setLastMove([move.from, move.to]);
     }
   };
 
-  promotion = (piece) => {
-    this.setState({ pendingPromotion: true });
-
-    if (!this.state.pendingPromotion) {
-      const from = this.state.pendingMove[0];
-      const to = this.state.pendingMove[1];
-      this.chess.move({ from, to, promotion: piece });
-      this.setState({
-        fen: this.chess.fen(),
-        lastMove: [from, to],
-        selectVisible: false,
-      });
-      setTimeout(this.randomMove, 500);
-    }
+  const promotion = (piece) => {
+    const from = pendingMove[0];
+    const to = pendingMove[1];
+    chess.move({ from, to, promotion: piece });
+    setFen(chess.fen());
+    setLastMove([from, to]);
+    setSelectVisible(false);
+    setTimeout(randomMove, 500);
   };
 
-  turnColor = () => {
-    return this.chess.turn() === "w" ? "white" : "black";
+  const turnColor = () => {
+    return chess.turn() === "w" ? "white" : "black";
   };
 
-  calcMovable = () => {
+  const calcMovable = () => {
     const dests = new Map();
-    this.chess.SQUARES.forEach((square) => {
-      const moves = this.chess.moves({ square, verbose: true });
+    chess.SQUARES.forEach((square) => {
+      const moves = chess.moves({ square, verbose: true });
       if (moves.length) {
         dests.set(
           square,
@@ -96,55 +95,35 @@ export default class App extends React.Component {
     };
   };
 
-  render() {
-    return (
-      <div style={{ background: "#2b313c", height: "100vh" }}>
-        <div style={{ paddingTop: "10vh" }}>
-          <Chessground
-            width="38vw"
-            height="38vw"
-            turnColor={this.turnColor()}
-            movable={this.calcMovable()}
-            lastMove={this.lastMove}
-            fen={this.state.fen}
-            onMove={this.onMove}
-            style={{ margin: "auto" }}
-          />
-        </div>
-        <Modal
-          title="Promotion"
-          visible={this.state.selectVisible}
-          footer={null}
-          closable={false}
-        >
-          <div style={{ textAlign: "center", cursor: "pointer" }}>
-            <img
-              src={queen}
-              alt="Queen"
-              style={{ width: 50 }}
-              onClick={() => this.promotion("q")}
-            />
-            <img
-              src={rook}
-              alt="Rook"
-              style={{ width: 50 }}
-              onClick={() => this.promotion("r")}
-            />
-            <img
-              src={bishop}
-              alt="Bishop"
-              style={{ width: 50 }}
-              onClick={() => this.promotion("b")}
-            />
-            <img
-              src={knight}
-              alt="Knight"
-              style={{ width: 50 }}
-              onClick={() => this.promotion("n")}
+  return true ? (
+    <div className="h-screen w-screen flex justify-center items-center">
+      <Loading
+        className="w-32 h-32 text-blue-600 font-bold text-2xl"
+        text="Connecting"
+      />
+    </div>
+  ) : (
+    <div className="bg-white h-screen flex justify-center items-center">
+      <Chessground
+        width="40vw"
+        height="40vw"
+        turnColor={turnColor()}
+        movable={calcMovable()}
+        lastMove={lastMove}
+        fen={fen}
+        onMove={onMove}
+      />
+      <Modal visible={selectVisible}>
+        {["q", "r", "b", "n"].map((piece) => (
+          <div className="group flex justify-center items-center w-24 h-24 transition-all rounded-full transform hover:bg-blue-500 hover:scale-110">
+            <div
+              onClick={() => promotion(piece)}
+              className={`piece ${turnColor()}-${piece} w-5/6 h-5/6 transition-all transform group-hover:-translate-y-1`}
+              key={piece}
             />
           </div>
-        </Modal>
-      </div>
-    );
-  }
+        ))}
+      </Modal>
+    </div>
+  );
 }
