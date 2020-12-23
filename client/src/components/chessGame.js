@@ -15,16 +15,13 @@ export default class ChessGame extends React.Component {
       turn: "white",
       lastMove: undefined,
       pendingMove: undefined,
-      fen: "",
+      fen: "start",
       selectVisible: false,
     };
   }
 
   componentDidMount() {
-    console.log("stateTurn", this.state.turn);
-    console.log("propsColor", this.props.playerColor);
     this.context.on("move", ({ move }) => {
-      console.log(move);
       this.chess.move(move);
       this.setState({
         turn: this.props.playerColor,
@@ -34,23 +31,22 @@ export default class ChessGame extends React.Component {
     });
   }
 
-  componentWillUnmount() {
-    this.context.disconnect();
-  }
-
   sendMoveToServer() {
-    console.log(this.state.lastMove);
     this.context.emit(
       "move",
       {
         room: this.props.room,
         move: this.state.lastMove,
       },
-      () =>
-        this.setState({
-          turn: this.props.playerColor === "white" ? "black" : "white",
-        })
+      () => this.changeTurn()
     );
+  }
+
+  changeTurn() {
+    const color = this.props.room ? this.props.playerColor : this.state.turn;
+    this.setState({
+      turn: color === "white" ? "black" : "white",
+    });
   }
 
   onMove = (from, to) => {
@@ -68,9 +64,11 @@ export default class ChessGame extends React.Component {
         {
           fen: this.chess.fen(),
           lastMove: { from, to },
-          turn: this.props.playerColor === "white" ? "black" : "white",
         },
-        () => this.sendMoveToServer()
+        () => {
+          this.changeTurn();
+          if (this.props.room) this.sendMoveToServer();
+        }
       );
     }
   };
@@ -88,7 +86,10 @@ export default class ChessGame extends React.Component {
         lastMove: move,
         selectVisible: false,
       },
-      () => this.sendMoveToServer()
+      () => {
+        this.changeTurn();
+        if (this.props.room) this.sendMoveToServer();
+      }
     );
   };
 
@@ -107,17 +108,16 @@ export default class ChessGame extends React.Component {
     return {
       free: false,
       dests,
-      color: this.props.playerColor,
+      color: this.props.room ? this.props.playerColor : this.state.turn,
     };
   };
 
   render() {
     return (
-      <div className="bg-white h-screen flex justify-center items-center">
-        <div>{this.props.room}</div>
+      <div className="bg-white flex justify-center items-center">
         <Chessground
-          width="40vw"
-          height="40vw"
+          width="100vmin"
+          height="100vmin"
           turnColor={this.state.turn}
           movable={this.calcMovable()}
           lastMove={this.lastMove}
@@ -128,7 +128,7 @@ export default class ChessGame extends React.Component {
         <Modal visible={this.state.selectVisible}>
           {["q", "r", "b", "n"].map((piece) => (
             <div
-              className="group flex justify-center items-center w-24 h-24 transition-all rounded-full transform hover:bg-blue-500 hover:scale-110"
+              className="group flex justify-center items-center w-24 h-24 transition-all rounded-full transform hover:bg-blue-500 hover:scale-110 text-center"
               key={piece}
             >
               <div
