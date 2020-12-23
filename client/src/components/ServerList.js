@@ -49,7 +49,7 @@ export default function ServerList({ handleClick, children, ...restProps }) {
                 ))
               ) : (
                 <tr>
-                  <td colspan="3" className="text-center font-medium">
+                  <td colSpan="3" className="text-center font-medium">
                     <div className="text-tertiary m-2">No rooms.</div>
                     <div className="text-secondary m-2">
                       Create a room to play online.

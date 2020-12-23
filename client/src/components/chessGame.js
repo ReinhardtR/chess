@@ -17,6 +17,7 @@ export default class ChessGame extends React.Component {
       pendingMove: undefined,
       fen: "start",
       selectVisible: false,
+      check: false,
     };
   }
 
@@ -38,14 +39,15 @@ export default class ChessGame extends React.Component {
         room: this.props.room,
         move: this.state.lastMove,
       },
-      () => this.changeTurn()
+      () => this.afterMove()
     );
   }
 
-  changeTurn() {
+  afterMove() {
     const color = this.props.room ? this.props.playerColor : this.state.turn;
     this.setState({
       turn: color === "white" ? "black" : "white",
+      check: this.chess.in_check(),
     });
   }
 
@@ -66,7 +68,7 @@ export default class ChessGame extends React.Component {
           lastMove: { from, to },
         },
         () => {
-          this.changeTurn();
+          this.afterMove();
           if (this.props.room) this.sendMoveToServer();
         }
       );
@@ -87,7 +89,7 @@ export default class ChessGame extends React.Component {
         selectVisible: false,
       },
       () => {
-        this.changeTurn();
+        this.afterMove();
         if (this.props.room) this.sendMoveToServer();
       }
     );
@@ -124,6 +126,9 @@ export default class ChessGame extends React.Component {
           fen={this.state.fen}
           onMove={this.onMove}
           orientation={this.props.playerColor}
+          check={this.state.check}
+          animation={{ duration: 500 }}
+          drawable={{ defaultSnapToValidMove: false }}
         />
         <Modal visible={this.state.selectVisible}>
           {["q", "r", "b", "n"].map((piece) => (
