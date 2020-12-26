@@ -1,7 +1,12 @@
 import { io } from "socket.io-client";
 import { createContext } from "react";
 
-export const socket = io.connect("https://reinhardtr.herokuapp.com", {
+const host =
+  window.location.hostname === "localhost"
+    ? "http://localhost:4000"
+    : "https://reinhardtr.herokuapp.com";
+
+export const socket = io.connect(host, {
   transports: ["websocket"],
 });
 

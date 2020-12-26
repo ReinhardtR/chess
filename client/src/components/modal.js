@@ -50,7 +50,7 @@ export default function Modal({
               )}
 
               <div className="text-secondary text-3xl font-bold my-1">
-                <div className="pr-8">{title}</div>
+                <div className="text-center">{title}</div>
                 {children}
               </div>
             </div>

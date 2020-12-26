@@ -17,83 +17,31 @@ export default class ChessGame extends React.Component {
       pendingMove: undefined,
       fen: "start",
       selectVisible: false,
-      check: false,
+      result: { title: "", desc: "" },
     };
   }
 
   componentDidMount() {
-    this.context.on("move", ({ move }) => {
-      this.chess.move(move);
-      this.setState({
-        turn: this.props.playerColor,
-        lastMove: move,
-        fen: this.chess.fen(),
-      });
-    });
-  }
-
-  sendMoveToServer() {
-    this.context.emit(
-      "move",
-      {
-        room: this.props.room,
-        move: this.state.lastMove,
-      },
-      () => this.afterMove()
-    );
-  }
-
-  afterMove() {
-    const color = this.props.room ? this.props.playerColor : this.state.turn;
-    this.setState({
-      turn: color === "white" ? "black" : "white",
-      check: this.chess.in_check(),
-    });
-  }
-
-  onMove = (from, to) => {
-    const moves = this.chess.moves({ verbose: true });
-    for (let i = 0, len = moves.length; i < len; i++) {
-      if (moves[i].flags.indexOf("p") !== -1 && moves[i].from === from) {
+    if (this.props.room) {
+      this.context.on("move", (move) => {
+        this.chess.move(move);
         this.setState({
-          pendingMove: [from, to],
-          selectVisible: true,
-        });
-      }
-    }
-    if (this.chess.move({ from, to, promotion: "x" })) {
-      this.setState(
-        {
+          turn: this.props.playerColor,
+          lastMove: move,
           fen: this.chess.fen(),
-          lastMove: { from, to },
-        },
-        () => {
-          this.afterMove();
-          if (this.props.room) this.sendMoveToServer();
-        }
-      );
-    }
-  };
+        });
+      });
 
-  promotion = (piece) => {
-    const move = {
-      from: this.state.pendingMove[0],
-      to: this.state.pendingMove[1],
-      promotion: piece,
-    };
-    this.chess.move(move);
-    this.setState(
-      {
-        fen: this.chess.fen(),
-        lastMove: move,
-        selectVisible: false,
-      },
-      () => {
-        this.afterMove();
-        if (this.props.room) this.sendMoveToServer();
-      }
-    );
-  };
+      this.context.on("you-won", (desc) => {
+        this.setState({
+          result: {
+            title: "You lost",
+            desc,
+          },
+        });
+      });
+    }
+  }
 
   calcMovable = () => {
     const dests = new Map();
@@ -114,6 +62,97 @@ export default class ChessGame extends React.Component {
     };
   };
 
+  onMove = (from, to) => {
+    const moves = this.chess.moves({ verbose: true });
+    for (let i = 0, len = moves.length; i < len; i++) {
+      if (moves[i].flags.indexOf("p") !== -1 && moves[i].from === from) {
+        this.setState({
+          pendingMove: [from, to],
+          selectVisible: true,
+        });
+      }
+    }
+    if (this.chess.move({ from, to, promotion: "x" })) {
+      this.setState(
+        {
+          fen: this.chess.fen(),
+          lastMove: { from, to },
+        },
+        () => {
+          this.afterMove();
+        }
+      );
+    }
+  };
+
+  afterMove() {
+    const color = this.props.room ? this.props.playerColor : this.state.turn;
+    this.setState({
+      turn: color === "white" ? "black" : "white",
+    });
+    if (this.props.room) this.sendMoveToServer();
+    this.checkResult();
+  }
+
+  sendMoveToServer() {
+    this.context.emit("move", {
+      roomId: this.props.room.id,
+      move: this.state.lastMove,
+    });
+  }
+
+  promotion = (piece) => {
+    const move = {
+      from: this.state.pendingMove[0],
+      to: this.state.pendingMove[1],
+      promotion: piece,
+    };
+    this.chess.move(move);
+    this.setState(
+      {
+        fen: this.chess.fen(),
+        lastMove: move,
+        selectVisible: false,
+      },
+      () => {
+        this.afterMove();
+      }
+    );
+  };
+
+  checkResult() {
+    if (this.chess.in_checkmate()) {
+      this.setState({
+        result: {
+          title: "You won",
+          desc: "Checkmate.",
+        },
+      });
+      this.context.emit("checkmate", this.props.room.id);
+    } else if (this.chess.in_stalemate()) {
+      this.setState({
+        result: {
+          title: "Draw",
+          desc: "Stalemate position.",
+        },
+      });
+    } else if (this.chess.in_threefold_repetition()) {
+      this.setState({
+        result: {
+          title: "Draw",
+          desc: "Threefold repitition.",
+        },
+      });
+    } else if (this.chess.insufficient_material()) {
+      this.setState({
+        result: {
+          title: "Draw",
+          desc: "Insufficient material.",
+        },
+      });
+    }
+  }
+
   render() {
     return (
       <div className="bg-white flex justify-center items-center">
@@ -126,11 +165,11 @@ export default class ChessGame extends React.Component {
           fen={this.state.fen}
           onMove={this.onMove}
           orientation={this.props.playerColor}
-          check={this.state.check}
+          check={this.chess.in_check()}
           animation={{ duration: 500 }}
           drawable={{ defaultSnapToValidMove: false }}
         />
-        <Modal visible={this.state.selectVisible}>
+        <Modal visible={this.state.selectVisible} title="Promotion">
           {["q", "r", "b", "n"].map((piece) => (
             <div
               className="group flex justify-center items-center w-24 h-24 transition-all rounded-full transform hover:bg-blue-500 hover:scale-110 text-center"
@@ -142,6 +181,13 @@ export default class ChessGame extends React.Component {
               />
             </div>
           ))}
+        </Modal>
+        <Modal
+          visible={this.state.result.title}
+          title={this.state.result.title}
+          handleClick={() => this.props.endGame()}
+        >
+          <p className="text-base">{this.state.result.desc}</p>
         </Modal>
       </div>
     );

@@ -15,25 +15,33 @@ export default function App() {
   const [room, setRoom] = useState();
   const [playerColor, setPlayerColor] = useState("white");
   const [showMenu, setShowMenu] = useState(true);
-  const [creatingRoom, setCreatingRoom] = useState(false);
-  const [roomIsFull, setRoomIsFull] = useState(false);
+  const [modal, setModal] = useState("");
 
   const createRoom = ({ name, password }) => {
     const newRoom = {
       id: socket.id,
       name,
       password,
-      creator: username,
-      player: "",
+      creator: {
+        name: username,
+        id: socket.id,
+      },
+      player: {
+        name: "",
+        id: "",
+      },
     };
     socket.emit("create-room", newRoom);
-    setCreatingRoom(false);
+    setModal("");
     setRoom(newRoom);
   };
 
   const joinRoom = (newRoom) => {
-    if (newRoom.player) {
-      setRoomIsFull(true);
+    if (room) {
+      setModal("You're already in a room.");
+      return;
+    } else if (newRoom.player.name) {
+      setModal("That room is already full.");
       return;
     }
     socket.emit("join-room", { username, id: newRoom.id });
@@ -43,9 +51,7 @@ export default function App() {
 
   const leaveRoom = () => {
     socket.emit("leave-room", room);
-    console.log(room);
     setRoom();
-    console.log(room);
   };
 
   return (
@@ -68,7 +74,9 @@ export default function App() {
             <ServerList handleClick={(newRoom) => joinRoom(newRoom)} />
             <Button
               extraClass={room ? "bg-tertiary" : "bg-primary-gradient"}
-              handleClick={() => (room ? leaveRoom() : setCreatingRoom(true))}
+              handleClick={() =>
+                room ? leaveRoom() : setModal("Create a room")
+              }
             >
               {room ? "LEAVE ROOM" : "CREATE ROOM"}
             </Button>
@@ -86,19 +94,25 @@ export default function App() {
         </div>
         <div className="absolute inset-y-0 right-0 z-0">
           <div className="flex justify-center items-center w-screen h-screen">
-            <ChessGame key={room} room={room} playerColor={playerColor} />
+            <ChessGame
+              key={room}
+              room={room}
+              playerColor={playerColor}
+              endGame={() => {
+                setRoom();
+                setPlayerColor("white");
+              }}
+            />
           </div>
         </div>
       </div>
       <Modal
-        visible={creatingRoom || roomIsFull}
-        errorStyle={roomIsFull}
-        title={roomIsFull ? "Room is full" : "Create a room"}
-        handleClick={() =>
-          creatingRoom ? setCreatingRoom(false) : setRoomIsFull(false)
-        }
+        visible={modal}
+        errorStyle={modal === "That room is already full."}
+        title={modal}
+        handleClick={() => setModal("")}
       >
-        {creatingRoom && (
+        {modal === "Create a room" && (
           <CreateRoomForm
             handleSubmit={(roomName, roomPassword) => {
               createRoom({

@@ -1,6 +1,5 @@
 import React, { useContext, useState, useEffect } from "react";
 import { SocketContext } from "../server";
-import Loading from "../components/Loading";
 import { ReactComponent as LockIcon } from "../assets/lock.svg";
 
 export default function ServerList({ handleClick, children, ...restProps }) {
@@ -15,8 +14,6 @@ export default function ServerList({ handleClick, children, ...restProps }) {
   socket.on("get-server-rooms", (serverRooms) => {
     setRooms(serverRooms);
   });
-
-  console.log(rooms);
 
   return (
     <div {...restProps} className="flex flex-col w-auto h-4/5">
@@ -38,21 +35,20 @@ export default function ServerList({ handleClick, children, ...restProps }) {
               {rooms.length ? (
                 rooms.map((room) => (
                   <ServerList.Item
-                    key={room.creator}
+                    key={room.id}
                     roomName={room.name}
-                    creator={room.creator}
-                    player={room.player}
+                    creator={room.creator.name}
+                    player={room.player.name}
                     password={room.password}
-                    status={"Waiting for players"}
                     handleClick={() => handleClick(room)}
                   />
                 ))
               ) : (
                 <tr>
                   <td colSpan="3" className="text-center font-medium">
-                    <div className="text-tertiary m-2">No rooms.</div>
+                    <div className="text-tertiary m-2">No rooms</div>
                     <div className="text-secondary m-2">
-                      Create a room to play online.
+                      Create a room to play online
                     </div>
                   </td>
                 </tr>
