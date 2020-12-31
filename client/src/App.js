@@ -52,6 +52,7 @@ export default function App() {
   const leaveRoom = () => {
     socket.emit("leave-room", room);
     setRoom();
+    setPlayerColor("white");
   };
 
   return (
@@ -98,10 +99,7 @@ export default function App() {
               key={room}
               room={room}
               playerColor={playerColor}
-              endGame={() => {
-                setRoom();
-                setPlayerColor("white");
-              }}
+              endGame={() => leaveRoom()}
             />
           </div>
         </div>
